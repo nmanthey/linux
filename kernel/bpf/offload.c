@@ -32,6 +32,7 @@ static DECLARE_RWSEM(bpf_devs_lock);
 static LIST_HEAD(bpf_prog_offload_devs);
 static LIST_HEAD(bpf_map_offload_devs);
 
+#ifdef CONFIG_NET
 static int bpf_dev_offload_check(struct net_device *netdev)
 {
 	if (!netdev)
@@ -84,6 +85,7 @@ err_maybe_put:
 	kfree(offload);
 	return err;
 }
+#endif // CONFIG_NET
 
 static int __bpf_offload_ndo(struct bpf_prog *prog, enum bpf_netdev_command cmd,
 			     struct netdev_bpf *data)
@@ -291,6 +293,16 @@ static int bpf_map_offload_ndo(struct bpf_offloaded_map *offmap,
 	return netdev->netdev_ops->ndo_bpf(netdev, &data);
 }
 
+static void __bpf_map_offload_destroy(struct bpf_offloaded_map *offmap)
+{
+	WARN_ON(bpf_map_offload_ndo(offmap, BPF_OFFLOAD_MAP_FREE));
+	/* Make sure BPF_MAP_GET_NEXT_ID can't find this dead map */
+	bpf_map_free_id(&offmap->map, true);
+	list_del_init(&offmap->offloads);
+	offmap->netdev = NULL;
+}
+
+#ifdef CONFIG_NET
 struct bpf_map *bpf_map_offload_map_alloc(union bpf_attr *attr)
 {
 	struct net *net = current->nsproxy->net_ns;
@@ -333,15 +345,6 @@ err_unlock:
 	return ERR_PTR(err);
 }
 
-static void __bpf_map_offload_destroy(struct bpf_offloaded_map *offmap)
-{
-	WARN_ON(bpf_map_offload_ndo(offmap, BPF_OFFLOAD_MAP_FREE));
-	/* Make sure BPF_MAP_GET_NEXT_ID can't find this dead map */
-	bpf_map_free_id(&offmap->map, true);
-	list_del_init(&offmap->offloads);
-	offmap->netdev = NULL;
-}
-
 void bpf_map_offload_map_free(struct bpf_map *map)
 {
 	struct bpf_offloaded_map *offmap = map_to_offmap(map);
@@ -355,6 +358,7 @@ void bpf_map_offload_map_free(struct bpf_map *map)
 
 	kfree(offmap);
 }
+#endif // CONFIG_NET
 
 int bpf_map_offload_lookup_elem(struct bpf_map *map, void *key, void *value)
 {
