@@ -1250,6 +1250,7 @@ void bpf_prog_destroy(struct bpf_prog *fp)
 }
 EXPORT_SYMBOL_GPL(bpf_prog_destroy);
 
+#if defined(CONFIG_NET)
 /**
  *	sk_filter_trim_cap - run a packet through a socket filter
  *	@sk: sock associated with &sk_buff
@@ -6823,3 +6824,4 @@ out:
 	release_sock(sk);
 	return ret;
 }
+#endif  // CONFIG_NET
